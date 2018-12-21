@@ -17,19 +17,23 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.EditText;
+import android.widget.AutoCompleteTextView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.GeoDataClient;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
@@ -38,24 +42,26 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
+public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.OnConnectionFailedListener {
     private static final int LOCATION_PERMISSION_REQ_CODE = 234;
     private static final String TAG = "Nitin";
     private static final float DEFAULT_ZOOM = 15f;
 
     private GoogleMap mMap;
+    private GeoDataClient mGeoDataClient;
     private boolean mLocationPermissionGranted = false;
     private FusedLocationProviderClient mFusedLocationProviderClient;
 
-    private EditText searchBar;
+    private AutoCompleteTextView mSearchBar;
+    private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
-        searchBar = findViewById(R.id.search_bar);
-        searchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+        mSearchBar = findViewById(R.id.search_bar);
+        mSearchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 if (actionId == EditorInfo.IME_ACTION_DONE) {
@@ -66,6 +72,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+        mGeoDataClient = Places.getGeoDataClient(this);
+
+        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
+                this,
+                mGeoDataClient,
+                new LatLngBounds(new LatLng(10.362045, 77.426159), new LatLng(31.816808, 76.668343)),
+                null);
+
+        mSearchBar.setAdapter(mPlaceAutocompleteAdapter);
+
         if (isServicesOK()) {
             getLocationPermission();
         }
@@ -73,7 +89,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private void locatePlace() {
         Log.d(TAG, "locatePlace: locating place");
-        String str = searchBar.getText().toString();
+        String str = mSearchBar.getText().toString();
 
         Geocoder geocoder = new Geocoder(MapsActivity.this);
         List<Address> list = new ArrayList<>();
@@ -200,5 +216,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void gpsIconClicked(View view) {
         Log.d(TAG, "gpsIconClicked: clicked gps icon");
         getDeviceLocation();
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+
     }
 }
