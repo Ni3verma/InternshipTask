@@ -3,6 +3,8 @@ package com.importio.nitin.solarcalculator;
 import android.Manifest;
 import android.app.Dialog;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -10,6 +12,10 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -24,20 +30,57 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
     private static final int LOCATION_PERMISSION_REQ_CODE = 234;
+    private static final String TAG = "Nitin";
 
     private GoogleMap mMap;
     private boolean mLocationPermissionGranted = false;
     private FusedLocationProviderClient mFusedLocationProviderClient;
+
+    private EditText searchBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
 
+        searchBar = findViewById(R.id.search_bar);
+        searchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    locatePlace();
+                    return true;
+                }
+                return false;
+            }
+        });
+
         if (isServicesOK()) {
             getLocationPermission();
+        }
+    }
+
+    private void locatePlace() {
+        Log.d(TAG, "locatePlace: locating place");
+        String str = searchBar.getText().toString();
+
+        Geocoder geocoder = new Geocoder(MapsActivity.this);
+        List<Address> list = new ArrayList<>();
+        try {
+            list = geocoder.getFromLocationName(str, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (list.size() > 0) {
+            Address address = list.get(0);
+            Log.d(TAG, "found location" + address.toString());
         }
     }
 
@@ -59,7 +102,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     @Override
                     public void onComplete(@NonNull Task task) {
                         if (task.isSuccessful()) {
-                            Log.d("Nitin", "found location");
+                            Log.d("Nitin", "found current location");
                             Location currLocation = (Location) task.getResult();
 
                             if (currLocation != null) {
@@ -80,31 +123,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
     }
 
-    private boolean isServicesOK() {
-        int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
-        if (available == ConnectionResult.SUCCESS) {
-            //everything is fine
-            return true;
-        } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
-            //error but we can resolve it
-            Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(this, available, 123);
-            dialog.show();
-        } else {
-            Toast.makeText(this, "google services unavailable", Toast.LENGTH_SHORT).show();
-        }
-        return false;
-    }
-
-
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
@@ -118,6 +136,21 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
             mMap.getUiSettings().setMyLocationButtonEnabled(false);
         }
+    }
+
+    private boolean isServicesOK() {
+        int available = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(this);
+        if (available == ConnectionResult.SUCCESS) {
+            //everything is fine
+            return true;
+        } else if (GoogleApiAvailability.getInstance().isUserResolvableError(available)) {
+            //error but we can resolve it
+            Dialog dialog = GoogleApiAvailability.getInstance().getErrorDialog(this, available, 123);
+            dialog.show();
+        } else {
+            Toast.makeText(this, "google services unavailable", Toast.LENGTH_SHORT).show();
+        }
+        return false;
     }
 
     private void getLocationPermission() {
