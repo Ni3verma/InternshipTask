@@ -2,6 +2,7 @@ package com.importio.nitin.solarcalculator;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -13,7 +14,9 @@ import android.support.v4.app.FragmentActivity;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +30,7 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
@@ -37,6 +41,7 @@ import java.util.List;
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
     private static final int LOCATION_PERMISSION_REQ_CODE = 234;
     private static final String TAG = "Nitin";
+    private static final float DEFAULT_ZOOM = 15f;
 
     private GoogleMap mMap;
     private boolean mLocationPermissionGranted = false;
@@ -81,6 +86,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (list.size() > 0) {
             Address address = list.get(0);
             Log.d(TAG, "found location" + address.toString());
+            moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), DEFAULT_ZOOM, address.getAddressLine(0));
         }
     }
 
@@ -106,10 +112,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             Location currLocation = (Location) task.getResult();
 
                             if (currLocation != null) {
-                                moveCamera(new LatLng(currLocation.getLatitude(), currLocation.getLongitude()), 15f);
+                                moveCamera(new LatLng(currLocation.getLatitude(), currLocation.getLongitude()), DEFAULT_ZOOM, "My location");
                             }
                         } else {
-                            Log.d("Nitin", "could not find location");
+                            Toast.makeText(MapsActivity.this, "location not found", Toast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -119,8 +125,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    private void moveCamera(LatLng latLng, float zoom) {
+    private void moveCamera(LatLng latLng, float zoom, String title) {
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
+
+        if (!title.equals("My location")) { //don't add marker for user current location
+            MarkerOptions options = new MarkerOptions()
+                    .position(latLng)
+                    .title(title);
+
+            mMap.addMarker(options);
+            hideSoftKeyboard();
+        }
     }
 
     @Override
@@ -136,6 +151,11 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.setMyLocationEnabled(true);
             mMap.getUiSettings().setMyLocationButtonEnabled(false);
         }
+    }
+
+    private void hideSoftKeyboard() {
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(this.getCurrentFocus().getWindowToken(), 0);
     }
 
     private boolean isServicesOK() {
@@ -175,5 +195,10 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 initMap();
             }
         }
+    }
+
+    public void gpsIconClicked(View view) {
+        Log.d(TAG, "gpsIconClicked: clicked gps icon");
+        getDeviceLocation();
     }
 }
