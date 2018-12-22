@@ -46,6 +46,12 @@ import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
 import java.io.IOException;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -152,6 +158,59 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         @Override
         protected String[] doInBackground(Integer... integers) {
             //now i am going to push code from my other computer,so next commit may contain some errors
+            
+            Document document;
+		try {
+                        double lat=40.71;
+                        double lng=-73.98;
+                        int day=22;
+                        
+                        //sunrise and sunset
+			document = Jsoup.connect("https://www.timeanddate.com/sun/@"+lat+","+lng).get();
+
+			Elements tableBody=document.getElementsByTag("tbody");
+                        
+                        
+                        //sunrise
+                        Element data=tableBody.get(0).child(day-1);
+                        String sunrise=data.child(1).text().substring(0,5);
+                        
+                        int openBrace=data.child(1).text().indexOf("(");
+                        int closeBrace=data.child(1).text().indexOf(")");
+                        String degree=data.child(1).text().substring(openBrace+1,closeBrace-1);
+                        
+                        String direction=data.child(1).child(0).attr("title");
+                        print("sunrise="+sunrise+" "+degree+" degrees "+direction);
+                        
+                        
+                        //sunset
+                        String sunset=data.child(2).text().substring(0,5);
+                        
+                        openBrace=data.child(2).text().indexOf("(");
+                        closeBrace=data.child(2).text().indexOf(")");
+                        degree=data.child(2).text().substring(openBrace+1,closeBrace-1);
+                        
+                        direction=data.child(2).child(0).attr("title");
+                        print("sunset="+sunset+" "+degree+" degrees "+direction);
+                        
+                        //moonrise and moonset
+                        document=Jsoup.connect("https://www.timeanddate.com/moon/@"+lat+","+lng).get();
+                        tableBody=document.getElementsByTag("tbody");
+                        
+                        data=tableBody.get(0).child(day-1);
+                        String moonrise=data.child(1).text();
+                        String moonset=data.child(3).text();
+                        if (moonrise.equals("-")) {
+                            moonrise=data.child(4).text();
+                            moonset=data.child(2).text();
+                        }
+                        
+                        print("moonrise="+moonrise+"   moonset="+moonset);
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+            
             return new String[0];
         }
     }
