@@ -151,6 +151,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         @Override
         protected String[] doInBackground(Integer... integers) {
+            //now i am going to push code from my other computer,so next commit may contain some errors
             return new String[0];
         }
     }
