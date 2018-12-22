@@ -20,6 +20,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,21 +46,24 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 
-import java.io.IOException;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.OnConnectionFailedListener {
     private static final int LOCATION_PERMISSION_REQ_CODE = 234;
     private static final String TAG = "Nitin";
     private static final float DEFAULT_ZOOM = 15f;
+    private int DATE;
 
     private GoogleMap mMap;
     private GeoDataClient mGeoDataClient;
@@ -151,67 +155,50 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             mMap.addMarker(options);
             hideSoftKeyboard();
         }
+
+        new GetPhaseTimeAsync().execute("https://www.timeanddate.com/sun/@" + latLng.latitude + "," + latLng.longitude, "" + DATE);
     }
 
-    class GetPhaseTimeAsync extends AsyncTask<Integer, Void, String[]> {
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_maps);
 
-        @Override
-        protected String[] doInBackground(Integer... integers) {
-            //now i am going to push code from my other computer,so next commit may contain some errors
-            
-            Document document;
-		try {
-                        double lat=40.71;
-                        double lng=-73.98;
-                        int day=22;
-                        
-                        //sunrise and sunset
-			document = Jsoup.connect("https://www.timeanddate.com/sun/@"+lat+","+lng).get();
+        mSearchBar = findViewById(R.id.search_bar);
+        mSearchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    locatePlace();
+                    return true;
+                }
+                return false;
+            }
+        });
+        mSearchBar.setOnItemClickListener(mAutocompleteClickListener);
 
-			Elements tableBody=document.getElementsByTag("tbody");
-                        
-                        
-                        //sunrise
-                        Element data=tableBody.get(0).child(day-1);
-                        String sunrise=data.child(1).text().substring(0,5);
-                        
-                        int openBrace=data.child(1).text().indexOf("(");
-                        int closeBrace=data.child(1).text().indexOf(")");
-                        String degree=data.child(1).text().substring(openBrace+1,closeBrace-1);
-                        
-                        String direction=data.child(1).child(0).attr("title");
-                        print("sunrise="+sunrise+" "+degree+" degrees "+direction);
-                        
-                        
-                        //sunset
-                        String sunset=data.child(2).text().substring(0,5);
-                        
-                        openBrace=data.child(2).text().indexOf("(");
-                        closeBrace=data.child(2).text().indexOf(")");
-                        degree=data.child(2).text().substring(openBrace+1,closeBrace-1);
-                        
-                        direction=data.child(2).child(0).attr("title");
-                        print("sunset="+sunset+" "+degree+" degrees "+direction);
-                        
-                        //moonrise and moonset
-                        document=Jsoup.connect("https://www.timeanddate.com/moon/@"+lat+","+lng).get();
-                        tableBody=document.getElementsByTag("tbody");
-                        
-                        data=tableBody.get(0).child(day-1);
-                        String moonrise=data.child(1).text();
-                        String moonset=data.child(3).text();
-                        if (moonrise.equals("-")) {
-                            moonrise=data.child(4).text();
-                            moonset=data.child(2).text();
-                        }
-                        
-                        print("moonrise="+moonrise+"   moonset="+moonset);
+        mGoogleApiClient = new GoogleApiClient
+                .Builder(this)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .enableAutoManage(this, this)
+                .build();
 
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-            
-            return new String[0];
+        mGeoDataClient = Places.getGeoDataClient(this);
+
+        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
+                this,
+                mGeoDataClient,
+                new LatLngBounds(new LatLng(10.362045, 77.426159), new LatLng(31.816808, 76.668343)),
+                null);
+
+        mSearchBar.setAdapter(mPlaceAutocompleteAdapter);
+
+        String date = new SimpleDateFormat("dd", Locale.getDefault()).format(new Date());
+        DATE = Integer.parseInt(date);
+
+        if (isServicesOK()) {
+            getLocationPermission();
         }
     }
 
@@ -296,43 +283,88 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     };
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_maps);
+    class GetPhaseTimeAsync extends AsyncTask<String, Void, String[]> {
 
-        mSearchBar = findViewById(R.id.search_bar);
-        mSearchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    locatePlace();
-                    return true;
+        @Override
+        protected void onPostExecute(String[] result) {
+            ProgressBar progress = findViewById(R.id.progress);
+            progress.setVisibility(View.GONE);
+
+            TextView sunrise = findViewById(R.id.sunrise);
+            TextView sunset = findViewById(R.id.sunset);
+            TextView moonrise = findViewById(R.id.moonrise);
+            TextView moonset = findViewById(R.id.moonset);
+
+            sunrise.setText(result[0]);
+            sunset.setText(result[1]);
+            moonrise.setText(result[2]);
+            moonset.setText(result[3]);
+        }
+
+        @Override
+        protected void onPreExecute() {
+            ProgressBar progress = findViewById(R.id.progress);
+            progress.setVisibility(View.VISIBLE);
+        }
+
+        @Override
+        protected String[] doInBackground(String... params) {
+            String result[] = new String[4];
+            Document document;
+            try {
+                int day = Integer.parseInt(params[1]);
+
+                //sunrise and sunset
+                document = Jsoup.connect(params[0]).get();
+
+                Elements tableBody = document.getElementsByTag("tbody");
+
+
+                //sunrise
+                Element data = tableBody.get(0).child(day - 1);
+                String sunrise = data.child(1).text().substring(0, 5);
+
+                int openBrace = data.child(1).text().indexOf("(");
+                int closeBrace = data.child(1).text().indexOf(")");
+                String degree = data.child(1).text().substring(openBrace + 1, closeBrace - 1);
+
+                String direction = data.child(1).child(0).attr("title");
+                Log.d(TAG, "sunrise=" + sunrise + " " + degree + " degrees " + direction);
+                result[0] = sunrise;
+
+
+                //sunset
+                String sunset = data.child(2).text().substring(0, 5);
+
+                openBrace = data.child(2).text().indexOf("(");
+                closeBrace = data.child(2).text().indexOf(")");
+                degree = data.child(2).text().substring(openBrace + 1, closeBrace - 1);
+
+                direction = data.child(2).child(0).attr("title");
+                Log.d(TAG, "sunset=" + sunset + " " + degree + " degrees " + direction);
+                result[1] = sunset;
+
+                //moonrise and moonset
+
+                document = Jsoup.connect(params[0].replace("sun", "moon")).get();
+                tableBody = document.getElementsByTag("tbody");
+
+                data = tableBody.get(0).child(day - 1);
+                String moonrise = data.child(1).text();
+                String moonset = data.child(3).text();
+                if (moonrise.equals("-")) {
+                    moonrise = data.child(4).text();
+                    moonset = data.child(2).text();
                 }
-                return false;
+
+                result[2] = moonrise;
+                result[3] = moonset;
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-        });
-        mSearchBar.setOnItemClickListener(mAutocompleteClickListener);
 
-        mGoogleApiClient = new GoogleApiClient
-                .Builder(this)
-                .addApi(Places.GEO_DATA_API)
-                .addApi(Places.PLACE_DETECTION_API)
-                .enableAutoManage(this, this)
-                .build();
-
-        mGeoDataClient = Places.getGeoDataClient(this);
-
-        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
-                this,
-                mGeoDataClient,
-                new LatLngBounds(new LatLng(10.362045, 77.426159), new LatLng(31.816808, 76.668343)),
-                null);
-
-        mSearchBar.setAdapter(mPlaceAutocompleteAdapter);
-
-        if (isServicesOK()) {
-            getLocationPermission();
+            return result;
         }
     }
 }
