@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -143,6 +144,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
             mMap.addMarker(options);
             hideSoftKeyboard();
+        }
+    }
+
+    class GetPhaseTimeAsync extends AsyncTask<Integer, Void, String[]> {
+
+        @Override
+        protected String[] doInBackground(Integer... integers) {
+            return new String[0];
         }
     }
 
