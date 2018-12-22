@@ -17,6 +17,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.widget.AdapterView;
 import android.widget.AutoCompleteTextView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,9 +25,14 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.PendingResult;
+import com.google.android.gms.common.api.ResultCallback;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.location.places.AutocompletePrediction;
 import com.google.android.gms.location.places.GeoDataClient;
+import com.google.android.gms.location.places.Place;
+import com.google.android.gms.location.places.PlaceBuffer;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -41,6 +47,7 @@ import com.google.android.gms.tasks.Task;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback, GoogleApiClient.OnConnectionFailedListener {
     private static final int LOCATION_PERMISSION_REQ_CODE = 234;
@@ -49,43 +56,28 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     private GoogleMap mMap;
     private GeoDataClient mGeoDataClient;
+    private GoogleApiClient mGoogleApiClient;
     private boolean mLocationPermissionGranted = false;
     private FusedLocationProviderClient mFusedLocationProviderClient;
 
     private AutoCompleteTextView mSearchBar;
     private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
+    private ResultCallback<PlaceBuffer> mUpdatePlaceDetailsCallback = new ResultCallback<PlaceBuffer>() {
+        @Override
+        public void onResult(@NonNull PlaceBuffer places) {
+            if (places.getStatus().isSuccess()) {
+                Place place = places.get(0);
+                moveCamera(new LatLng(place.getLatLng().latitude, place.getLatLng().longitude),
+                        DEFAULT_ZOOM,
+                        place.getName().toString());
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_maps);
-
-        mSearchBar = findViewById(R.id.search_bar);
-        mSearchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
-            @Override
-            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
-                if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    locatePlace();
-                    return true;
-                }
-                return false;
+                places.release();
+            } else {
+                Log.d(TAG, "onResult: place not found");
+                places.release();
             }
-        });
-
-        mGeoDataClient = Places.getGeoDataClient(this);
-
-        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
-                this,
-                mGeoDataClient,
-                new LatLngBounds(new LatLng(10.362045, 77.426159), new LatLng(31.816808, 76.668343)),
-                null);
-
-        mSearchBar.setAdapter(mPlaceAutocompleteAdapter);
-
-        if (isServicesOK()) {
-            getLocationPermission();
         }
-    }
+    };
 
     private void locatePlace() {
         Log.d(TAG, "locatePlace: locating place");
@@ -221,5 +213,57 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
+    }
+
+    private AdapterView.OnItemClickListener mAutocompleteClickListener = new AdapterView.OnItemClickListener() {
+        @Override
+        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            hideSoftKeyboard();
+
+            AutocompletePrediction item = mPlaceAutocompleteAdapter.getItem(position);
+            String placeId = Objects.requireNonNull(item).getPlaceId();
+            PendingResult<PlaceBuffer> placeResult = Places.GeoDataApi.getPlaceById(mGoogleApiClient, placeId);
+            placeResult.setResultCallback(mUpdatePlaceDetailsCallback);
+        }
+    };
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_maps);
+
+        mSearchBar = findViewById(R.id.search_bar);
+        mSearchBar.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override
+            public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+                if (actionId == EditorInfo.IME_ACTION_DONE) {
+                    locatePlace();
+                    return true;
+                }
+                return false;
+            }
+        });
+        mSearchBar.setOnItemClickListener(mAutocompleteClickListener);
+
+        mGoogleApiClient = new GoogleApiClient
+                .Builder(this)
+                .addApi(Places.GEO_DATA_API)
+                .addApi(Places.PLACE_DETECTION_API)
+                .enableAutoManage(this, this)
+                .build();
+
+        mGeoDataClient = Places.getGeoDataClient(this);
+
+        mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
+                this,
+                mGeoDataClient,
+                new LatLngBounds(new LatLng(10.362045, 77.426159), new LatLng(31.816808, 76.668343)),
+                null);
+
+        mSearchBar.setAdapter(mPlaceAutocompleteAdapter);
+
+        if (isServicesOK()) {
+            getLocationPermission();
+        }
     }
 }
