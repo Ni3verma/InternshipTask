@@ -45,6 +45,7 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.importio.nitin.solarcalculator.models.MyPlaceInfo;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -70,6 +71,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private GoogleApiClient mGoogleApiClient;
     private boolean mLocationPermissionGranted = false;
     private FusedLocationProviderClient mFusedLocationProviderClient;
+    private MyPlaceInfo mPlace;
 
     private AutoCompleteTextView mSearchBar;
     private PlaceAutocompleteAdapter mPlaceAutocompleteAdapter;
@@ -79,7 +81,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (places.getStatus().isSuccess()) {
                 Place place = places.get(0);
                 moveCamera(new LatLng(place.getLatLng().latitude, place.getLatLng().longitude),
-                        DEFAULT_ZOOM,
                         place.getName().toString());
 
                 places.release();
@@ -105,7 +106,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         if (list.size() > 0) {
             Address address = list.get(0);
             Log.d(TAG, "found location" + address.toString());
-            moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), DEFAULT_ZOOM, address.getAddressLine(0));
+            moveCamera(new LatLng(address.getLatitude(), address.getLongitude()), address.getAddressLine(0));
         }
     }
 
@@ -131,7 +132,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                             Location currLocation = (Location) task.getResult();
 
                             if (currLocation != null) {
-                                moveCamera(new LatLng(currLocation.getLatitude(), currLocation.getLongitude()), DEFAULT_ZOOM, "My location");
+                                moveCamera(new LatLng(currLocation.getLatitude(), currLocation.getLongitude()), "My location");
                             }
                         } else {
                             Toast.makeText(MapsActivity.this, "location not found", Toast.LENGTH_SHORT).show();
@@ -144,8 +145,9 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
     }
 
-    private void moveCamera(LatLng latLng, float zoom, String title) {
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, zoom));
+    private void moveCamera(LatLng latLng, String title) {
+        mPlace = new MyPlaceInfo(latLng.latitude, latLng.longitude, title);
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, MapsActivity.DEFAULT_ZOOM));
 
         if (!title.equals("My location")) { //don't add marker for user current location
             MarkerOptions options = new MarkerOptions()
@@ -264,6 +266,27 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void gpsIconClicked(View view) {
         Log.d(TAG, "gpsIconClicked: clicked gps icon");
         getDeviceLocation();
+    }
+
+    public void prevDayClicked(View view) {
+        if (DATE > 1) {
+            DATE--;
+        }
+        new GetPhaseTimeAsync().execute("https://www.timeanddate.com/sun/@" + mPlace.getLat() + "," + mPlace.getLng(), "" + DATE);
+    }
+
+    public void todayClicked(View view) {
+        String date = new SimpleDateFormat("dd", Locale.getDefault()).format(new Date());
+        DATE = Integer.parseInt(date);
+
+        getDeviceLocation();
+    }
+
+    public void nextDayClicked(View view) {
+        if (DATE < 30) {
+            DATE++;
+        }
+        new GetPhaseTimeAsync().execute("https://www.timeanddate.com/sun/@" + mPlace.getLat() + "," + mPlace.getLng(), "" + DATE);
     }
 
     @Override
