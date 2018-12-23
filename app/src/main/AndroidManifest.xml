@@ -38,6 +38,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".Notification.MyNotificationIntentService"
+            android:exported="false" />
+        <receiver
+            android:name=".Notification.MyNotificationReceiver"
+            android:enabled="true"
+            android:exported="false" />
     </application>
 
 </manifest>

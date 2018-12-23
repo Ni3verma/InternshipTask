@@ -1,3 +1,15 @@
 <resources>
     <string name="app_name">Solar calculator</string>
+    <string name="save_btn_cd">pin this place</string>
+    <string name="bookmark_btn_cd">show all pinned places</string>
+    <string name="gps_btn_cd">go to current location</string>
+    <string name="alarm_btn_cd">add alarm</string>
+    <string name="search_bar_hint">Enter City,Country,Address</string>
+    <string name="moonrise_label">Moonrise</string>
+    <string name="moonset_label">Moonset</string>
+    <string name="sunrise_label">Sunrise</string>
+    <string name="sunset_label">Sunset</string>
+    <string name="prev_day_cd">see prev day info</string>
+    <string name="today_btn_cd">see today info</string>
+    <string name="next_day_btn_cd">see next day info</string>
 </resources>

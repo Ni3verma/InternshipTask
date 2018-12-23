@@ -1,10 +1,13 @@
 package com.importio.nitin.solarcalculator;
 
 import android.Manifest;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -47,6 +50,7 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.importio.nitin.solarcalculator.Notification.MyNotificationReceiver;
 import com.importio.nitin.solarcalculator.database.AppDatabase;
 import com.importio.nitin.solarcalculator.database.MyDiskExecutor;
 import com.importio.nitin.solarcalculator.database.PlaceEntry;
@@ -60,6 +64,7 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -371,6 +376,52 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+    }
+
+    public void addAlarm(View view) {
+        String date[] = new SimpleDateFormat("dd-MM-HH-mm", Locale.getDefault())
+                .format(new Date())
+                .split("-");
+
+        int currDayOfMonth = Integer.parseInt(date[0]);
+        int currMonth = Integer.parseInt(date[1]);
+        int currHour = Integer.parseInt(date[2]);
+        int currMin = Integer.parseInt(date[3]);
+
+        TextView riseTextView = findViewById(R.id.sunrise);
+        String riseTime[] = riseTextView.getText().toString().split("\\.");
+        int hourToSet, minToSet;
+        try {
+            hourToSet = Integer.parseInt(riseTime[0]);
+            minToSet = Integer.parseInt(riseTime[1]);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
+        }
+
+        if (DATE > currDayOfMonth || (DATE == currDayOfMonth && hourToSet > currHour)) {
+            //everything is good, so show notification
+            Calendar cal = Calendar.getInstance();
+            cal.set(Calendar.MONTH, currMonth);
+            cal.set(Calendar.YEAR, 2018);
+            cal.set(Calendar.DAY_OF_MONTH, currDayOfMonth);
+            cal.set(Calendar.HOUR_OF_DAY, hourToSet);
+            cal.set(Calendar.MINUTE, minToSet);
+
+            Intent notifyIntent = new Intent(this, MyNotificationReceiver.class);
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                    this, 23, notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT
+            );
+            AlarmManager alarmManager = (AlarmManager) this.getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null) {
+                alarmManager.set(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pendingIntent);
+            }
+            Toast.makeText(this, "You will be notified of golden hour", Toast.LENGTH_SHORT).show();
+
+            return;
+        }
+
+        Toast.makeText(this, "Golden time has passed", Toast.LENGTH_SHORT).show();
     }
 
     class GetPhaseTimeAsync extends AsyncTask<String, Void, String[]> {
