@@ -1,8 +1,10 @@
 package com.importio.nitin.solarcalculator;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -45,6 +47,9 @@ import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
+import com.importio.nitin.solarcalculator.database.AppDatabase;
+import com.importio.nitin.solarcalculator.database.MyDiskExecutor;
+import com.importio.nitin.solarcalculator.database.PlaceEntry;
 import com.importio.nitin.solarcalculator.models.MyPlaceInfo;
 
 import org.jsoup.Jsoup;
@@ -67,10 +72,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private int DATE;
 
     private GoogleMap mMap;
-    private GeoDataClient mGeoDataClient;
     private GoogleApiClient mGoogleApiClient;
     private boolean mLocationPermissionGranted = false;
-    private FusedLocationProviderClient mFusedLocationProviderClient;
     private MyPlaceInfo mPlace;
 
     private AutoCompleteTextView mSearchBar;
@@ -120,7 +123,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void getDeviceLocation() {
-        mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        FusedLocationProviderClient mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
         try {
             if (mLocationPermissionGranted) {
                 final Task location = mFusedLocationProviderClient.getLastLocation();
@@ -158,6 +161,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             hideSoftKeyboard();
         }
 
+        //get phase times of this new location
         new GetPhaseTimeAsync().execute("https://www.timeanddate.com/sun/@" + latLng.latitude + "," + latLng.longitude, "" + DATE);
     }
 
@@ -186,7 +190,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 .enableAutoManage(this, this)
                 .build();
 
-        mGeoDataClient = Places.getGeoDataClient(this);
+        GeoDataClient mGeoDataClient = Places.getGeoDataClient(this);
 
         mPlaceAutocompleteAdapter = new PlaceAutocompleteAdapter(
                 this,
@@ -214,14 +218,18 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 return;
             }
+            //to show user current location
             mMap.setMyLocationEnabled(true);
+            //we have added our own button for this, problem with default is that it's position is fixed
             mMap.getUiSettings().setMyLocationButtonEnabled(false);
         }
     }
 
     private void hideSoftKeyboard() {
         InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-        imm.hideSoftInputFromWindow(this.getCurrentFocus().getWindowToken(), 0);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(Objects.requireNonNull(this.getCurrentFocus()).getWindowToken(), 0);
+        }
     }
 
     private boolean isServicesOK() {
@@ -305,6 +313,65 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             placeResult.setResultCallback(mUpdatePlaceDetailsCallback);
         }
     };
+
+    public void pinLocation(View view) {
+        MyDiskExecutor.getsInstance().getDiskIO().execute(new Runnable() {
+            @Override
+            public void run() {
+                PlaceEntry place = AppDatabase.getsInstance(MapsActivity.this).PlaceDao().getPlaceByTitle(mPlace.getName());
+                final String message;
+                if (place == null) { //place does not exist, so create a new entry
+                    AppDatabase.getsInstance(MapsActivity.this).PlaceDao().addPlace(
+                            new PlaceEntry(mPlace.getName(), mPlace.getLat(), mPlace.getLng())
+                    );
+                    message = "Location saved";
+                } else {  //place already exists
+                    message = "place already pinned";
+                }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(MapsActivity.this, message, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        });
+    }
+
+    public void showAllPins(View view) {
+        MyDiskExecutor.getsInstance().getDiskIO().execute(new Runnable() {
+            @Override
+            public void run() {
+                // get all pinned places from databases
+                final List<PlaceEntry> places = AppDatabase.getsInstance(MapsActivity.this).PlaceDao().getAllPinnedPlaces();
+                //extract names from places to show in dialog list view
+                final String names[] = new String[places.size()];
+                for (int i = 0; i < places.size(); i++) {
+                    names[i] = places.get(i).getTitle();
+                }
+
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        AlertDialog.Builder builder = new AlertDialog.Builder(MapsActivity.this);
+                        builder.setTitle("Pinned places");
+                        builder.setItems(names, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int position) {
+                                PlaceEntry place = places.get(position);
+
+                                moveCamera(new LatLng(place.getLat(), place.getLng()), place.getTitle());
+                            }
+                        });
+
+                        builder.create().show();
+                    }
+                });
+            }
+        });
+
+    }
 
     class GetPhaseTimeAsync extends AsyncTask<String, Void, String[]> {
 

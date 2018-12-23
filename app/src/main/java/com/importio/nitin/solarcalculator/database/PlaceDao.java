@@ -16,4 +16,7 @@ public interface PlaceDao {
 
     @Query("delete from place where id=:id")
     void deletePlace(int id);
+
+    @Query("select * from place where title=:title")
+    PlaceEntry getPlaceByTitle(String title);
 }
