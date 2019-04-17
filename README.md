@@ -1,4 +1,4 @@
-# InternshipTask
+# Solar calculator
 
 <img src="https://github.com/Ni3verma/InternshipTask/blob/master/ss/curLocation.png" alt="current location" width="300px" height="450px">
 
